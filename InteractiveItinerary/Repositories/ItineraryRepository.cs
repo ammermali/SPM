@@ -162,7 +162,11 @@ namespace InteractiveItinerary.Repositories
                 if (!existingStops.TryGetValue(stop.Id, out var tracked))
                     throw new KeyNotFoundException($"Stop with Id {stop.Id} does not exist.");
 
-                if (!ReferenceEquals(tracked, stop))
+                var isLinkOnlyStub = string.IsNullOrEmpty(stop.Name)
+                    && string.IsNullOrEmpty(stop.Description)
+                    && stop.Location.Address is null;
+
+                if (!ReferenceEquals(tracked, stop) && !isLinkOnlyStub)
                 {
                     tracked.Name = stop.Name;
                     tracked.Description = stop.Description;
