@@ -144,5 +144,55 @@ namespace InteractiveItinerary.Tests
             Assert.Equal(StatusCodes.Status403Forbidden, error.Status);
             Assert.Equal("Forbidden", error.Error);
         }
+
+        [Fact]
+        public async Task AddAndUpdateStop_WithUnauthorizedRole_Returns403AndDoesNotModify_AC05()
+        {
+            using var db = new TestSqliteDb();
+            var editor = CreateController(db, AppRoles.Editor);
+            var created = Assert.IsType<ItineraryDTO>(
+                Assert.IsType<CreatedAtActionResult>((await editor.Create(new CreateItineraryDTO { Title = "Draft" }, CancellationToken.None)).Result).Value);
+
+            var stopResult = await editor.AddStop(created.Id, new StopRequestDTO
+            {
+                Name = "Initial",
+                Description = "Desc",
+                Latitude = 41.9,
+                Longitude = 12.5,
+                Address = "Addr"
+            }, CancellationToken.None);
+            var addedStop = Assert.IsType<StopDTO>(Assert.IsType<CreatedAtActionResult>(stopResult.Result).Value);
+
+            var viewer = CreateController(db, AppRoles.Viewer);
+            var payload = new StopRequestDTO { Name = "Tampered", Description = "d", Latitude = 0, Longitude = 0, Address = "a" };
+
+            var addForbidden = Assert.IsType<ObjectResult>((await viewer.AddStop(created.Id, payload, CancellationToken.None)).Result);
+            Assert.Equal(StatusCodes.Status403Forbidden, addForbidden.StatusCode);
+            Assert.Equal("Forbidden", Assert.IsType<ApiErrorResponse>(addForbidden.Value).Error);
+
+            var updateForbidden = Assert.IsType<ObjectResult>((await viewer.UpdateStop(created.Id, addedStop.Id, payload, CancellationToken.None)).Result);
+            Assert.Equal(StatusCodes.Status403Forbidden, updateForbidden.StatusCode);
+            Assert.Equal("Forbidden", Assert.IsType<ApiErrorResponse>(updateForbidden.Value).Error);
+
+            var stopsResult = Assert.IsType<OkObjectResult>((await editor.GetStops(created.Id, CancellationToken.None)).Result);
+            var stops = Assert.IsAssignableFrom<IReadOnlyList<StopDTO>>(stopsResult.Value);
+            Assert.Single(stops);
+            Assert.Equal("Initial", stops[0].Name);
+        }
+
+        [Fact]
+        public async Task AddStop_OutOfRangeCoordinates_Returns400BadRequest_AC04()
+        {
+            using var db = new TestSqliteDb();
+            var editor = CreateController(db, AppRoles.Editor);
+            var created = Assert.IsType<ItineraryDTO>(
+                Assert.IsType<CreatedAtActionResult>((await editor.Create(new CreateItineraryDTO { Title = "Draft" }, CancellationToken.None)).Result).Value);
+
+            var bad = new StopRequestDTO { Name = "Bad", Description = "d", Latitude = 91, Longitude = 0, Address = "Addr" };
+            var badResult = Assert.IsType<BadRequestObjectResult>((await editor.AddStop(created.Id, bad, CancellationToken.None)).Result);
+            var error = Assert.IsType<ApiErrorResponse>(badResult.Value);
+            Assert.Equal(StatusCodes.Status400BadRequest, error.Status);
+            Assert.Equal("ValidationError", error.Error);
+        }
     }
 }

@@ -35,5 +35,14 @@ namespace InteractiveItinerary.Repositories
         Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
         Task<bool> ExistsAsync(int id, CancellationToken cancellationToken = default);
+
+        /// <summary>Returns the stops associated with an itinerary in route <c>Position</c> order (read-only).</summary>
+        Task<IReadOnlyList<Stop>> GetStopsByItineraryIdAsync(int itineraryId, CancellationToken cancellationToken = default);
+
+        /// <summary>Returns a single stop by its <paramref name="stopId"/>, or <c>null</c> if not found (read-only).</summary>
+        Task<Stop?> GetStopByIdAsync(int stopId, CancellationToken cancellationToken = default);
+
+        /// <summary>Updates an existing stop's fields and location. Returns <c>false</c> if not found.</summary>
+        Task<bool> UpdateStopAsync(Stop stop, CancellationToken cancellationToken = default);
     }
 }

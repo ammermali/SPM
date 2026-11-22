@@ -228,5 +228,59 @@ namespace InteractiveItinerary.Tests
                 Assert.Empty(ctx.Itineraries);
             }
         }
+
+        [Fact]
+        public async Task GetStopsByItineraryIdAsync_ReturnsOrderedStopsAndEmptyWhenMissing()
+        {
+            using var db = new TestSqliteDb();
+            int itineraryId;
+
+            using (var ctx = db.CreateContext())
+            {
+                var repo = new ItineraryRepository(ctx);
+                var it = await repo.AddAsync(new Itinerary
+                {
+                    Title = "Ordered Stops",
+                    Stops = { TestSqliteDb.MakeStop("First"), TestSqliteDb.MakeStop("Second"), TestSqliteDb.MakeStop("Third") }
+                });
+                itineraryId = it.Id;
+            }
+
+            using (var ctx = db.CreateContext())
+            {
+                var repo = new ItineraryRepository(ctx);
+                var stops = await repo.GetStopsByItineraryIdAsync(itineraryId);
+                Assert.Equal(new[] { "First", "Second", "Third" }, stops.Select(s => s.Name));
+
+                var missing = await repo.GetStopsByItineraryIdAsync(9999);
+                Assert.Empty(missing);
+            }
+        }
+
+        [Fact]
+        public async Task GetStopByIdAsync_ReturnsStopWhenFoundAndNullWhenMissing()
+        {
+            using var db = new TestSqliteDb();
+            int stopId;
+
+            using (var ctx = db.CreateContext())
+            {
+                var stop = TestSqliteDb.MakeStop("Piazza Navona", 41.8992, 12.4731);
+                ctx.Stops.Add(stop);
+                await ctx.SaveChangesAsync();
+                stopId = stop.Id;
+            }
+
+            using (var ctx = db.CreateContext())
+            {
+                var repo = new ItineraryRepository(ctx);
+                var found = await repo.GetStopByIdAsync(stopId);
+                Assert.NotNull(found);
+                Assert.Equal("Piazza Navona", found.Name);
+                Assert.Equal(41.8992, found.Location.Latitude);
+
+                Assert.Null(await repo.GetStopByIdAsync(9999));
+            }
+        }
     }
 }

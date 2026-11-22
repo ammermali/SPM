@@ -45,8 +45,35 @@ namespace InteractiveItinerary.Tests
         }
 
         [Theory]
+        [InlineData(-90, -180)]
+        [InlineData(-90, 180)]
+        [InlineData(90, -180)]
+        [InlineData(90, 180)]
+        [InlineData(0, 0)]
+        public async Task Location_BoundaryCoordinates_AreValidAndPersist(double lat, double lon)
+        {
+            object loc = new Location(lat, lon, "Valid");
+            Assert.Empty(Validate(loc));
+
+            using var db = new TestSqliteDb();
+            using var ctx = db.CreateContext();
+            var stop = new Stop { Name = "Boundary", Description = "d", Location = (Location)loc };
+            ctx.Stops.Add(stop);
+            await ctx.SaveChangesAsync();
+
+            var loaded = await ctx.Stops.FindAsync(stop.Id);
+            Assert.NotNull(loaded);
+            Assert.Equal(lat, loaded.Location.Latitude);
+            Assert.Equal(lon, loaded.Location.Longitude);
+        }
+
+        [Theory]
+        [InlineData(-90.0001, 0, "Valid")]
+        [InlineData(90.0001, 0, "Valid")]
         [InlineData(-91, 0, "Valid")]
         [InlineData(91, 0, "Valid")]
+        [InlineData(0, -180.0001, "Valid")]
+        [InlineData(0, 180.0001, "Valid")]
         [InlineData(0, -181, "Valid")]
         [InlineData(0, 181, "Valid")]
         [InlineData(0, 0, "")]

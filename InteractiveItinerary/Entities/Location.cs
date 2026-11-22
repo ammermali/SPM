@@ -4,10 +4,10 @@ namespace InteractiveItinerary.Entities
 {
     public readonly struct Location
     {
-        [Range(-90, 90, ErrorMessage = "Latitude must be between -90 and 90.")]
+        [Range(-90.0, 90.0, ErrorMessage = "Latitude must be between -90 and 90.")]
         public double Latitude { get; }
 
-        [Range(-180, 180, ErrorMessage = "Longitude must be between -180 and 180.")]
+        [Range(-180.0, 180.0, ErrorMessage = "Longitude must be between -180 and 180.")]
         public double Longitude { get; }
 
         [Required(ErrorMessage = "Address is required.")]

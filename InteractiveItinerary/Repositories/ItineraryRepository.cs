@@ -88,6 +88,41 @@ namespace InteractiveItinerary.Repositories
         public Task<bool> ExistsAsync(int id, CancellationToken cancellationToken = default)
             => _context.Itineraries.AnyAsync(i => i.Id == id, cancellationToken);
 
+        public async Task<IReadOnlyList<Stop>> GetStopsByItineraryIdAsync(int itineraryId, CancellationToken cancellationToken = default)
+        {
+            return await _context.ItineraryStops
+                .AsNoTracking()
+                .Where(j => j.ItineraryId == itineraryId)
+                .OrderBy(j => j.Position)
+                .Join(
+                    _context.Stops.AsNoTracking(),
+                    j => j.StopId,
+                    s => s.Id,
+                    (_, stop) => stop)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<Stop?> GetStopByIdAsync(int stopId, CancellationToken cancellationToken = default)
+            => _context.Stops
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == stopId, cancellationToken);
+
+        public async Task<bool> UpdateStopAsync(Stop stop, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(stop);
+
+            var existing = await _context.Stops.FindAsync(new object[] { stop.Id }, cancellationToken);
+            if (existing is null)
+                return false;
+
+            existing.Name = stop.Name;
+            existing.Description = stop.Description;
+            existing.Location = stop.Location;
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
         private async Task<IReadOnlyList<Itinerary>> QueryReadOnlyAsync(
             IQueryable<Itinerary> query, CancellationToken cancellationToken)
         {
