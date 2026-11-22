@@ -1,25 +1,24 @@
-﻿namespace InteractiveItinerary.Entities
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace InteractiveItinerary.Entities
 {
-    public readonly record struct Location
+    public readonly struct Location
     {
+        [Range(-90, 90, ErrorMessage = "Latitude must be between -90 and 90.")]
         public double Latitude { get; }
+
+        [Range(-180, 180, ErrorMessage = "Longitude must be between -180 and 180.")]
         public double Longitude { get; }
+
+        [Required(ErrorMessage = "Address is required.")]
+        [MaxLength(500, ErrorMessage = "Address cannot exceed 500 characters.")]
         public string Address { get; }
 
         public Location(double latitude, double longitude, string address)
         {
-            if (latitude < -90 || latitude > 90)
-                    throw new ArgumentOutOfRangeException(
-                    nameof(latitude), "Latitude must be between -90 and 90.");
-
-            if (longitude < -180 || longitude > 180)    
-                    throw new ArgumentOutOfRangeException(
-                    nameof(longitude), "Longitude must be between -180 and 180.");
-
             Latitude = latitude;
             Longitude = longitude;
-            Address = address ?? throw new ArgumentNullException(nameof(address));
+            Address = address;
         }
     }
-
 }
