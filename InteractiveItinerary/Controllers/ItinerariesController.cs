@@ -3,6 +3,7 @@ using InteractiveItinerary.Security;
 using InteractiveItinerary.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using InteractiveItinerary.Exceptions;
 
 namespace InteractiveItinerary.Controllers
 {
@@ -169,6 +170,84 @@ namespace InteractiveItinerary.Controllers
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new ApiErrorResponse(StatusCodes.Status404NotFound, "NotFound", ex.Message));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return BadRequest(new ApiErrorResponse(StatusCodes.Status400BadRequest, "ValidationError", ex.Message));
+            }
+        }
+
+        [HttpDelete("{id:int}/stops/{stopId:int}")]
+        [Authorize(Policy = AuthorizationPolicies.CanCreateItinerary)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> RemoveStop(int id, int stopId, CancellationToken cancellationToken)
+        {
+            if (!User.IsInRole(AppRoles.Editor))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new ApiErrorResponse(
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    $"You do not have the required role ({AppRoles.Editor}) to remove a stop from an itinerary."));
+            }
+
+            try
+            {
+                await _itineraryService.RemoveStopAsync(id, stopId, cancellationToken);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiErrorResponse(StatusCodes.Status404NotFound, "NotFound", ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ApiErrorResponse(StatusCodes.Status400BadRequest, "InvalidOperation", ex.Message));
+            }
+        }
+
+        [HttpPatch("{id:int}/stops/reorder")]
+        [Authorize(Policy = AuthorizationPolicies.CanCreateItinerary)]
+        [ProducesResponseType(typeof(IReadOnlyList<StopDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status409Conflict)]
+        public async Task<ActionResult<IReadOnlyList<StopDTO>>> ReorderStops(
+    int id,
+    [FromBody] ReorderStopsDTO? dto,
+    CancellationToken cancellationToken)
+        {
+            if (!User.IsInRole(AppRoles.Editor))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new ApiErrorResponse(
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    $"You do not have the required role ({AppRoles.Editor}) to reorder an itinerary's stops."));
+            }
+
+            if (dto is null)
+            {
+                return BadRequest(new ApiErrorResponse(
+                    StatusCodes.Status400BadRequest,
+                    "ValidationError",
+                    "Request body is required."));
+            }
+
+            try
+            {
+                var reordered = await _itineraryService.ReorderStopsAsync(id, dto.StopIds, cancellationToken);
+                return Ok(reordered);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiErrorResponse(StatusCodes.Status404NotFound, "NotFound", ex.Message));
+            }
+            catch (ItineraryStateConflictException ex)
+            {
+                return Conflict(new ApiErrorResponse(StatusCodes.Status409Conflict, "Conflict", ex.Message));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {

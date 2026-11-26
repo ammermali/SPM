@@ -1,16 +1,20 @@
 using InteractiveItinerary.DTO;
 using InteractiveItinerary.Entities;
 using InteractiveItinerary.Repositories;
+using InteractiveItinerary.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace InteractiveItinerary.Services
 {
     public class ItineraryService : IItineraryService
     {
         private readonly IItineraryRepository _itineraryRepository;
+        private readonly ItineraryDbContext? _dbContext;
 
-        public ItineraryService(IItineraryRepository itineraryRepository)
+        public ItineraryService(IItineraryRepository itineraryRepository, ItineraryDbContext? dbContext = null)
         {
             _itineraryRepository = itineraryRepository;
+            _dbContext = dbContext;
         }
 
         public async Task<ItineraryDTO> CreateDraftAsync(CreateItineraryDTO dto, CancellationToken cancellationToken = default)
@@ -142,6 +146,49 @@ namespace InteractiveItinerary.Services
                 throw new ArgumentException("Stop address is required.", nameof(dto));
             if (dto.Address.Length > 500)
                 throw new ArgumentException("Stop address cannot exceed 500 characters.", nameof(dto));
+        }
+
+        /// <summary>Loading the target itinerary, verifying that it exists, is currently in DRAFT status, and contains the requested stop, 
+        /// and then calling RemoveStopAssociationAsync on the repository to unlink the stop and compact sequence positions, 
+        /// throwing a domain/lookup exception if validation or removal fails.</summary>
+        public async Task RemoveStopAsync(int itineraryId, int stopId, CancellationToken cancellationToken = default)
+        {
+            var itinerary = await _itineraryRepository.GetByIdAsync(itineraryId, cancellationToken)
+                ?? throw new KeyNotFoundException($"Itinerary with Id {itineraryId} does not exist.");
+
+            if (itinerary.Status != ItineraryStatus.DRAFT)
+                throw new InvalidOperationException("Stops can only be removed from a DRAFT itinerary.");
+
+            if (itinerary.Stops.All(s => s.Id != stopId))
+                throw new KeyNotFoundException($"Stop with Id {stopId} is not associated with itinerary {itineraryId}.");
+
+            var removed = await _itineraryRepository.RemoveStopAssociationAsync(itineraryId, stopId, cancellationToken);
+            if (!removed)
+                throw new KeyNotFoundException($"Stop with Id {stopId} is not associated with itinerary {itineraryId}.");
+        }
+
+        public async Task<IReadOnlyList<StopDTO>> ReorderStopsAsync(
+            int itineraryId,
+            IReadOnlyList<int> stopIds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(stopIds);
+
+            await using var transaction = _dbContext is not null && _dbContext.Database.IsRelational()
+                ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+
+            var itinerary = await _itineraryRepository.GetByIdAsync(itineraryId, cancellationToken)
+                ?? throw new KeyNotFoundException($"Itinerary with Id {itineraryId} does not exist.");
+
+            itinerary.ReorderStops(stopIds);
+
+            await _itineraryRepository.UpdateAsync(itinerary, cancellationToken);
+
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+
+            return itinerary.Stops.Select(s => new StopDTO(s)).ToList();
         }
     }
 }

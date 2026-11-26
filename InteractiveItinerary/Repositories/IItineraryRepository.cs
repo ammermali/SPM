@@ -44,5 +44,8 @@ namespace InteractiveItinerary.Repositories
 
         /// <summary>Updates an existing stop's fields and location. Returns <c>false</c> if not found.</summary>
         Task<bool> UpdateStopAsync(Stop stop, CancellationToken cancellationToken = default);
+
+        /// <summary>Defines the repository contract to unlink a specific stop from an itinerary and shift subsequent stop positions down by one. </summary>
+        Task<bool> RemoveStopAssociationAsync(int itineraryId, int stopId, CancellationToken cancellationToken = default);
     }
 }

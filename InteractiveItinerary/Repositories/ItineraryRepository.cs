@@ -213,5 +213,35 @@ namespace InteractiveItinerary.Repositories
 
             return result;
         }
+
+        /// <summary>Looking up the matching ItineraryStops join record, deleting it while recording its position,
+        /// decrementing the Position of all subsequent stops in that itinerary by one to compact the sequence
+        /// and returning true if removed or false if not found.</summary>
+        public async Task<bool> RemoveStopAssociationAsync(
+            int itineraryId,
+            int stopId,
+            CancellationToken cancellationToken = default)
+        {
+            var association = await _context.ItineraryStops
+                .FirstOrDefaultAsync(j => j.ItineraryId == itineraryId && j.StopId == stopId, cancellationToken);
+
+            if (association is null)
+                return false;
+
+            var removedPosition = association.Position;
+            _context.ItineraryStops.Remove(association);
+
+            var subsequentAssociations = await _context.ItineraryStops
+                .Where(j => j.ItineraryId == itineraryId && j.Position > removedPosition)
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in subsequentAssociations)
+            {
+                item.Position -= 1;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
     }
 }

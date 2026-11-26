@@ -1,4 +1,5 @@
 using InteractiveItinerary.DTO;
+using Microsoft.EntityFrameworkCore;
 
 namespace InteractiveItinerary.Services
 {
@@ -32,5 +33,17 @@ namespace InteractiveItinerary.Services
 
         /// <summary>Returns the ordered stops (with coordinates) for an itinerary, or <c>null</c> if the itinerary does not exist.</summary>
         Task<IReadOnlyList<StopDTO>?> GetStopsAsync(int itineraryId, CancellationToken cancellationToken = default);
+
+        /// <summary>Removes a stop association from a draft itinerary after validating that the itinerary exists, is still in draft status,
+        /// and includes the target stop.</summary>
+        Task RemoveStopAsync(int itineraryId, int stopId, CancellationToken cancellationToken = default);
+
+        /// <summary> Verifies that the target itinerary exists and is in <see cref="Entities.ItineraryStatus.DRAFT"/> status,
+        /// validates and persists the new stop sequence inside a transaction, and returns the updated stops in order.
+        /// </summary>
+        Task<IReadOnlyList<StopDTO>> ReorderStopsAsync(
+            int itineraryId,
+            IReadOnlyList<int> stopIds,
+            CancellationToken cancellationToken = default);
     }
 }

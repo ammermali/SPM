@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using InteractiveItinerary.Exceptions;
 
 namespace InteractiveItinerary.Entities
 {
@@ -32,5 +34,46 @@ namespace InteractiveItinerary.Entities
 
         [MaxLength(200, ErrorMessage = "Geographic area cannot exceed 200 characters.")]
         public string? GeographicArea { get; set; }
+
+        /// <summary>
+        /// Reorders the stops currently linked to this draft itinerary according to <paramref name="stopIds"/>.
+        /// </summary>
+        public void ReorderStops(IReadOnlyList<int> stopIds)
+        {
+            ArgumentNullException.ThrowIfNull(stopIds);
+
+            if (Status != ItineraryStatus.DRAFT)
+                throw new InvalidOperationException($"Cannot reorder stops on itinerary {Id} because its status is {Status}; " +
+                    $"only DRAFT itineraries can be modified.");
+
+            if (stopIds.Count == 0)
+                throw new ArgumentException("The stop sequence cannot be empty.", nameof(stopIds));
+
+            if (stopIds.Distinct().Count() != stopIds.Count)
+                throw new InvalidOperationException("The stop sequence cannot contain duplicate stop IDs.");
+
+            if (stopIds.Count != Stops.Count)
+            {
+                throw new InvalidOperationException(
+                    "The stop sequence must contain all stops currently linked to this itinerary without adding or omitting stops.");
+            }
+
+            var stopsById = Stops.ToDictionary(s => s.Id);
+            var reorderedStops = new List<Stop>(stopIds.Count);
+
+            foreach (var stopId in stopIds)
+            {
+                if (!stopsById.TryGetValue(stopId, out var stop))
+                {
+                    throw new InvalidOperationException(
+                        $"Stop with Id {stopId} is not linked to itinerary {Id}.");
+                }
+
+                reorderedStops.Add(stop);
+            }
+
+            Stops.Clear();
+            Stops.AddRange(reorderedStops);
+        }
     }
 }
